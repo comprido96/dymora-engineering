@@ -60,9 +60,6 @@ The part I'd actually recommend to other solo builders: **I didn't integrate bil
 ## Security decisions worth stealing
 
 - **Broker, don't store in the clear.** Where the control plane must hold reversible third-party credentials, they are AES-256-GCM envelope-encrypted with a fresh nonce per use; the key lives in a zeroize-on-drop wrapper and never appears in SQL. There's a comment at the site explaining why this one secret is reversible while passwords are one-way hashed — because in five years I won't remember, and the next maintainer (possibly also me) shouldn't have to guess.
-- **SSRF guard on server-side egress.** The URLs the server fetches are system-derived, not user-supplied — and it validates them anyway: allowlisted ranges only, metadata/loopback/link-local rejected, and a uniform error so failures can't be used to map anything.
-- **Rate limiting that knows how consumer networks work.** One high-volume endpoint is keyed on a hash of the caller's credential, *not* the IP — because unrelated customers routinely share carrier-NAT egress IPs, and IP-keying would let one noisy household throttle its neighbors. A per-IP backstop wraps it anyway, because the keyed bucket is caller-mintable. A background sweep evicts stale limiter state, because the limiter map never evicts on its own.
-- **Constant-time comparison for privileged credentials** — flagged HIGH in a security audit I ran against my own service, then fixed and tracked to the commit. Auditing your own work only counts if findings become diffs.
 
 ## Deploys you can trust at 1 a.m.
 
