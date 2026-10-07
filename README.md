@@ -1,4 +1,4 @@
-# Solo-building a SaaS with hardware in the field: Rust, 800+ tests, and a team of one
+# Solo-building a SaaS with hardware in the field: Rust, 1,000+ tests, and a team of one
 
 
 I run Dymora, a connected-building platform I built and operate alone: an appliance installed on the customer's premises, a cloud control plane, and a mobile app, sold as a subscription. It is live, in production, with paying customers.
@@ -25,7 +25,7 @@ flowchart LR
     PAY[Payment provider] -->|webhooks| API
 ```
 
-The core service is ~49k lines of Rust (axum, tokio, sqlx, Postgres, Redis) exposing 37 HTTP endpoints, with an OpenAPI spec kept mechanically in sync with the code. It owns identity for two client types (browser sessions and native mobile, over one API), the full customer lifecycle, billing, push notification fan-out, and brokered access to on-site devices.
+The core service is ~63k lines of Rust (axum, tokio, sqlx, Postgres, Redis), with an OpenAPI 3.0 spec covering 49 paths and 58 operations, maintained by hand alongside the code. It owns identity for two client types (browser sessions and native mobile, over one API), the full customer lifecycle, billing, push notification fan-out, and brokered access to on-site devices.
 
 ## One state machine to rule the business
 
@@ -38,9 +38,9 @@ A customer's state is driven by three uncoordinated actors: a technician doing a
 
 When a payment webhook and a technician action race, one of them loses cleanly instead of both half-winning.
 
-## Testing: 806 tests, and integration tests that need no database
+## Testing: 1,000+ tests, and integration tests that need no database
 
-The service has 443 unit tests and 363 integration tests. The integration suite spins up the real axum app on an ephemeral port — but against **in-memory implementations of every port**, so the full HTTP contract runs in seconds with no Postgres or Redis.
+The service has about 500 unit tests and about 540 integration tests. The integration suite spins up the real axum app on an ephemeral port — but against **in-memory implementations of every port**, so the full HTTP contract runs in seconds with no Postgres or Redis.
 
 That's possible because the architecture is hexagonal in the unfashionable, literal sense: the app state is a bundle of ~20 `Arc<dyn Trait>` ports (persistence, payments, push delivery, device access, …), the domain layer imports no SDKs, and vendor types are confined to adapter modules and mapped at the boundary. The payment SDK appears in exactly one file.
 
@@ -65,7 +65,7 @@ The part I'd actually recommend to other solo builders: **I didn't integrate bil
 
 - Push to the dev branch → tests → image build → auto-deploy to a fully separated staging environment.
 - Prod is different on purpose: an annotated semver tag builds an **immutable image**, and promotion to production is a human action against a pinned digest, behind a required-reviewer gate. CI can never surprise production.
-- 62 migrations, every single one with a tested down-path. Migrations run at boot — but only *after* all config constructors, so a misconfigured deploy fails before it advances the schema past a rolled-back image. That ordering is a scar, not a theory: it comes from a real incident.
+- 41 migrations, every single one with a tested down-path. Migrations run at boot — but only *after* all config constructors, so a misconfigured deploy fails before it advances the schema past a rolled-back image. That ordering is a scar, not a theory: it comes from a real incident.
 - Graceful shutdown drains in-flight async work with a bounded timeout, so a deploy doesn't eat notifications mid-send.
 
 ## The part where software meets drywall
@@ -89,7 +89,7 @@ Monitoring built by the person it will wake up:
 
 Things I got wrong or would do differently:
 
-- I hand-rolled a ~12k-line server-rendered internal admin tool. It's well-tested and audited, but it's a quarter of the codebase spent on non-differentiating surface — today I'd evaluate off-the-shelf harder before building.
+- I hand-rolled a ~14k-line server-rendered internal admin tool. It's well-tested and audited, but it's roughly a fifth of the codebase spent on non-differentiating surface — today I'd evaluate off-the-shelf harder before building.
 - Deliberate deferral is a skill I had to learn: more than once I've fully built a feature, written the analysis proving it can be enabled later without a migration, and then consciously *not shipped it* because the customer-facing lifecycle mattered more. Scope discipline beats feature count when the team is one person.
 - Some infra automation shipped after the fleet did — early devices were hand-configured, and the automation had to be written to converge on reality rather than define it. The write-up of that gap is in the repo, dated honestly.
 
@@ -97,10 +97,10 @@ Things I got wrong or would do differently:
 
 | Metric | Value |
 |---|---|
-| Core service | ~49k LOC Rust (axum/tokio/sqlx) |
-| Tests | 806 (443 unit + 363 integration, incl. DB-invariant suite) |
-| HTTP endpoints | 37, OpenAPI spec kept in sync mechanically |
-| Migrations | 62, all reversible, all with tested down-paths |
+| Core service | ~63k LOC Rust (axum/tokio/sqlx) |
+| Tests | 1,049 (~500 unit + ~540 integration, incl. DB-invariant suite) |
+| HTTP API | 49 paths / 58 operations, OpenAPI 3.0 spec maintained by hand |
+| Migrations | 41, all reversible, all with tested down-paths |
 | Environments | Fully separated staging + production (separate DBs, secrets, billing config) |
 | Ops docs | ~40k lines of runbooks, decision records, and incident-derived rules |
 | Team | 1 |
